@@ -1,3 +1,4 @@
+import * as mDNS from 'multicast-dns'
 import Registry from './lib/registry'
 import Server from './lib/mdns-server'
 import Browser, { BrowserConfig } from './lib/browser'
@@ -14,7 +15,7 @@ export class Bonjour {
      * @param errorCallback Function | undefined
      */
     constructor(opts?: ServiceConfig, errorCallback?: Function | undefined) {
-        this.server = new Server(opts, errorCallback)
+        this.server = new Server(opts as unknown as mDNS.Options, errorCallback)
         this.registry = new Registry(this.server)
     }
 

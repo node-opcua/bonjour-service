@@ -11,8 +11,9 @@ import DnsTxt from './dns-txt'
 
 const TLD: string = '.local'
 
-export interface ServiceConfig extends mDNS.Options {
+export interface ServiceConfig extends Omit<mDNS.Options,"type"> {
     name: string
+    type?: string
     port: number
     protocol?: 'tcp' | 'udp'
     host?: string
