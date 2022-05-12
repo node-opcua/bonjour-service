@@ -1,22 +1,21 @@
-
-import Registry                     from './lib/registry'
-import Server                       from './lib/mdns-server'
-import Browser, { BrowserConfig }   from './lib/browser'
-import Service, { ServiceConfig, ServiceReferer }   from './lib/service'
+import Registry from './lib/registry'
+import Server from './lib/mdns-server'
+import Browser, { BrowserConfig } from './lib/browser'
+import Service, { ServiceConfig, ServiceReferer } from './lib/service'
 
 export class Bonjour {
-
-    private server      : Server
-    private registry    : Registry
+    private server: Server
+    private registry: Registry
+    private timerId: NodeJS.Timer | undefined
 
     /**
      * Setup bonjour service with optional config
      * @param opts ServiceConfig | undefined
      * @param errorCallback Function | undefined
      */
-    constructor(opts?: ServiceConfig | undefined, errorCallback?: Function | undefined) {
-        this.server     = new Server(opts, errorCallback)
-        this.registry   = new Registry(this.server)
+    constructor(opts?: ServiceConfig, errorCallback?: Function | undefined) {
+        this.server = new Server(opts, errorCallback)
+        this.registry = new Registry(this.server)
     }
 
     /**
@@ -55,28 +54,25 @@ export class Bonjour {
      * @returns
      */
     public findOne(opts: BrowserConfig | undefined = undefined, timeout = 10000, callback?: CallableFunction): Browser {
+        if (this.timerId) {
+            clearTimeout(this.timerId)
+            this.timerId = undefined
+        }
         const browser: Browser = new Browser(this.server.mdns, opts)
-        var timer: any
         browser.once('up', (service: Service) => {
-            if(timer !== undefined) clearTimeout(timer)
+            if (this.timerId !== undefined) {
+                clearTimeout(this.timerId)
+                this.timerId = undefined
+            }
             browser.stop()
-            if(callback) callback(service)
+            if (callback) callback(service)
         })
-        timer = setTimeout(() => {
+        this.timerId = setTimeout(() => {
             browser.stop()
-            if(callback) callback(null)
+            if (callback) callback(null)
         }, timeout)
         return browser
     }
-
-    /**
-     * Destroy the class
-     */
-    public destroy() {
-        this.registry.destroy()
-        this.server.mdns.destroy()
-    }
-
 }
 
 export { Service, ServiceReferer, ServiceConfig, Browser, BrowserConfig }
