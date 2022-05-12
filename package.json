@@ -1,5 +1,5 @@
 {
-  "name": "bonjour-service",
+  "name": "sterfive-bonjour-service",
   "version": "1.0.0",
   "description": "A Bonjour/Zeroconf implementation in TypeScript",
   "main": "./dist/index.js",
