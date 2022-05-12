@@ -1,36 +1,34 @@
-import flatten                                      from 'array-flatten'
-import dnsEqual                                     from 'dns-equal'
-import Server                                       from './mdns-server'
-import Service, { ServiceConfig, ServiceRecord }    from './service'
+import { setTimeout } from 'timers'
+import flatten from 'array-flatten'
+import dnsEqual from 'dns-equal'
+import * as mDNS from 'multicast-dns'
+import { MulticastDNS } from 'multicast-dns'
+import Server from './mdns-server'
+import Service, { ServiceConfig, ServiceRecord } from './service'
 
-
-
-const REANNOUNCE_MAX_MS : number    = 60 * 60 * 1000
-const REANNOUNCE_FACTOR : number    = 3
+const REANNOUNCE_MAX_MS: number = 60 * 60 * 1000
+const REANNOUNCE_FACTOR: number = 3
 
 export class Registry {
-
-    private server      : Server
-    private services    : Array<Service> = []
+    private server: Server
+    private services: Array<Service> = []
 
     constructor(server: Server) {
         this.server = server
     }
 
     public publish(config: ServiceConfig): Service {
-
-        function start(service: Service,registry: Registry, opts: {probe: boolean}) {
+        function start(service: Service, registry: Registry, opts: Service) {
             if (service.activated) return
             service.activated = true
-        
+
             registry.services.push(service)
-        
-            if(!(service instanceof Service)) return
-        
-            if(opts.probe) {
-                var service: Service = service
-                registry.probe(registry.server.mdns, service, (exists: any) => {
-                    if(exists) {
+
+            if (!(service instanceof Service)) return
+
+            if (opts.probe) {
+                registry.probe(registry.server.mdns, service, (exists: boolean) => {
+                    if (exists) {
                         service.stop()
                         console.log(new Error('Service name is already in use on the network'))
                         return
@@ -41,20 +39,20 @@ export class Registry {
                 registry.announce(registry.server, service)
             }
         }
-        
+
         function stop(service: Service, registry: Registry, callback?: CallableFunction) {
             if (!service.activated) return
-        
-            if(!(service instanceof Service)) return
+
+            if (!(service instanceof Service)) return
             registry.teardown(registry.server, service, callback)
-          
-            var index = registry.services.indexOf(service)
+
+            const index = registry.services.indexOf(service)
             if (index !== -1) registry.services.splice(index, 1)
         }
-        
-        const service     = new Service(config)
-        service.start   = start.bind(null, service, this)
-        service.stop    = stop.bind(null, service, this)
+
+        let service = new Service(config)
+        service.start = start.bind(null, service, this)
+        service.stop = stop.bind(null, service, this)
         service.start({ probe: config.probe !== false })
         return service
     }
@@ -65,7 +63,13 @@ export class Registry {
     }
 
     public destroy() {
-        this.services.map(service => service.destroyed = true)
+        this.services.map((service) => {
+            if (service._broadCastTimeout) {
+                clearTimeout(service._broadCastTimeout)
+                service._broadCastTimeout = undefined
+            }
+            service.destroyed = true
+        })
     }
 
     /**
@@ -78,16 +82,16 @@ export class Registry {
      * 0 and 250 ms) before probing.
      *
      */
-    private probe(mdns: any, service: Service, callback: CallableFunction) {
-        var sent    : boolean   = false
-        var retries : number    = 0
-        var timer   : any
-    
+    private probe(mdns: MulticastDNS, service: Service, callback: CallableFunction) {
+        let sent: boolean = false
+        let retries: number = 0
+        let timer: NodeJS.Timer
+
         const send = () => {
             // abort if the service have or is being stopped in the meantime
             if (!service.activated || service.destroyed) return
-        
-            mdns.query(service.fqdn, 'ANY', function () {
+
+            mdns.query(service.fqdn, 'ANY' as any, function () {
                 // This function will optionally be called with an error object. We'll
                 // just silently ignore it and retry as we normally would
                 sent = true
@@ -96,7 +100,11 @@ export class Registry {
             })
         }
 
-        const onresponse = (packet: any) => {
+        const matchRR = (rr: { name: string }): boolean => {
+            return dnsEqual(rr.name, service.fqdn)
+        }
+
+        const onresponse = (packet: mDNS.ResponsePacket) => {
             // Apparently conflicting Multicast DNS responses received *before*
             // the first probe packet is sent MUST be silently ignored (see
             // discussion of stale probe packets in RFC 6762 Section 8.2,
@@ -105,12 +113,8 @@ export class Registry {
             if (!sent) return
             if (packet.answers.some(matchRR) || packet.additionals.some(matchRR)) done(true)
         }
-        
-        const matchRR = (rr: Service) => {
-            return dnsEqual(rr.name, service.fqdn)
-        }
-        
-        const done = (exists: any) => {
+
+        const done = (exists: boolean) => {
             mdns.removeListener('response', onresponse)
             clearTimeout(timer)
             callback(!!exists)
@@ -120,7 +124,6 @@ export class Registry {
         setTimeout(send, Math.random() * 250)
     }
 
-
     /**
      * Initial service announcement
      *
@@ -129,17 +132,19 @@ export class Registry {
      * Broadcasts right away, then after 3 seconds, 9 seconds, 27 seconds,
      * and so on, up to a maximum interval of one hour.
      */
-    private announce (server: Server, service: Service) {
-        var delay = 1000
-        var packet: Array<ServiceRecord> = service.records()
-    
+    private announce(server: Server, service: Service) {
+        let delay = 1000
+        const packet: ServiceRecord[] = service.records()
+
         // Register the records
         server.register(packet)
 
         const broadcast = () => {
             if (!service.activated || service.destroyed) return
 
-            server.mdns.respond(packet, function () {
+            service._broadCastTimeout = undefined
+
+            server.mdns.respond({ answers: packet }, () => {
                 // This function will optionally be called with an error object. We'll
                 // just silently ignore it and retry as we normally would
                 if (!service.published) {
@@ -149,13 +154,13 @@ export class Registry {
                 }
                 delay = delay * REANNOUNCE_FACTOR
                 if (delay < REANNOUNCE_MAX_MS && !service.destroyed) {
-                    setTimeout(broadcast, delay).unref()
+                    service._broadCastTimeout = setTimeout(broadcast, delay)
                 }
             })
         }
-        broadcast()
+        service._broadCastTimeout = setTimeout(broadcast, 1)
     }
-  
+
     /**
      * Stop the given services
      *
@@ -163,29 +168,32 @@ export class Registry {
      * message is sent for each service to let the network know about the
      * shutdown.
      */
-    private teardown (server: Server, services: Array<Service> | Service, callback: any) {
-        if (!Array.isArray(services)) services = [services]
-    
-        services = services.filter((service: Service) =>  service.activated) // ignore services not currently starting or started
-    
-        var records: any = flatten.depth(services.map(function (service) {
-            service.activated = false
-            var records = service.records()
-            records.forEach((record: ServiceRecord) => {
-                record.ttl = 0 // prepare goodbye message
-            })
-            return records
-        }), 1)
-    
+    private teardown(server: Server, serviceOrServices: Array<Service> | Service, callback: any) {
+        let services = Array.isArray(serviceOrServices) ? serviceOrServices : [serviceOrServices]
+
+        services = services.filter((service: Service) => service.activated) as Service[] // ignore services not currently starting or started
+
+        const records = flatten.depth(
+            services.map((service) => {
+                service.activated = false
+                const records = service.records()
+                records.forEach((record: ServiceRecord) => {
+                    record.ttl = 0 // prepare goodbye message
+                })
+                return records
+            }),
+            1
+        ) as unknown as ServiceRecord[]
+
         if (records.length === 0) return callback && callback()
         server.unregister(records)
-    
+
         // send goodbye message
         server.mdns.respond(records, function () {
-            (services as Array<Service>).forEach(function (service) {
+            ;(services as Array<Service>).forEach(function (service) {
                 service.published = false
             })
-            if (typeof callback === "function") {
+            if (typeof callback === 'function') {
                 callback.apply(null, arguments)
             }
         })

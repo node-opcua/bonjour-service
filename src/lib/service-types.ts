@@ -2,15 +2,15 @@
  * Provide ServiceType
  */
 export interface ServiceType {
-    name?       : string,
-    protocol?   : 'tcp' | 'udp' | string | null | undefined,
-    subtypes?   : Array<string>
+    name?: string
+    protocol?: 'tcp' | 'udp' | string | null | undefined
+    subtypes?: Array<string>
 }
 
 /**
  * Provides underscore prefix to name
- * @param name 
- * @returns 
+ * @param name
+ * @returns
  */
 const Prefix = (name: string): string => {
     return '_' + name
@@ -19,31 +19,31 @@ const Prefix = (name: string): string => {
 /**
  * Check if key is allowed
  * @param key
- * @returns 
+ * @returns
  */
 const AllowedProp = (key: string): boolean => {
-    let keys: Array<string> = ['name','protocol','subtypes']
+    let keys: Array<string> = ['name', 'protocol', 'subtypes']
     return keys.includes(key)
 }
 
 /**
  * Format input ServiceType to string
- * @param data 
- * @returns 
+ * @param data
+ * @returns
  */
-export const toString = (data: ServiceType): any => {
+export const toString = (data: ServiceType): string => {
     // Format to correct order
     let formatted: ServiceType = {
-        name        : data.name,
-        protocol    : data.protocol,
-        subtypes    : data.subtypes
+        name: data.name,
+        protocol: data.protocol,
+        subtypes: data.subtypes
     }
     // Output as entries array
-    let entries: Array<any> = Object.entries(formatted)
+    let entries: Array<[string, string[] | string]> = Object.entries(formatted)
     return entries
-        .filter(([key,val]) => AllowedProp(key) && val !== undefined)
-        .reduce((prev, [key,val]) => {
-            switch(typeof val) {
+        .filter(([key, val]) => AllowedProp(key) && val !== undefined)
+        .reduce((prev, [key, val]) => {
+            switch (typeof val) {
                 case 'object':
                     val.map((i: string) => prev.push(Prefix(i)))
                     break
@@ -52,20 +52,20 @@ export const toString = (data: ServiceType): any => {
                     break
             }
             return prev
-        },[])
+        }, [] as string[])
         .join('.')
 }
 
 /**
  * Format input string to ServiceType
- * @param string 
- * @returns 
+ * @param string
+ * @returns
  */
 export const toType = (string: string): ServiceType => {
     // Split string into parts by dot
-    var parts: Array<string> = string.split('.')
+    const parts: Array<string> = string.split('.')
     // Remove the prefix
-    for(let i in parts) {
+    for (let i in parts) {
         if (parts[i][0] !== '_') continue
         parts[i] = parts[i].slice(1)
     }
