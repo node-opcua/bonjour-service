@@ -1,3 +1,9 @@
 node_modules
-src
 test
+.nyc_output
+.github
+.prettierrc
+.travis.yml
+.vscode
+coverage
+*.tgz
