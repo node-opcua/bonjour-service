@@ -78,15 +78,14 @@ export class Bonjour {
     /**
      * Destroy the class
      */
-     public destroy() {
+    public destroy(callback?: () => void) {
         if (this.timerId) {
             clearTimeout(this.timerId)
             this.timerId = undefined
         }
         this.registry.destroy()
-        this.server.mdns.destroy()
+        this.server.mdns.destroy(callback);
     }
-
 }
 
 export { Service, ServiceReferer, ServiceConfig, Browser, BrowserConfig }
