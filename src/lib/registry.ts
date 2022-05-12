@@ -11,18 +11,50 @@ const REANNOUNCE_FACTOR : number    = 3
 export class Registry {
 
     private server      : Server
-    private services    : Array<any> = []
-
-    private activated  : boolean = false
+    private services    : Array<Service> = []
 
     constructor(server: Server) {
         this.server = server
     }
 
     public publish(config: ServiceConfig): Service {
-        let service     = new Service(config)
-        service.start   = this.start.bind(service, this)
-        service.stop    = this.stop.bind(service, this)
+
+        function start(service: Service,registry: Registry, opts: {probe: boolean}) {
+            if (service.activated) return
+            service.activated = true
+        
+            registry.services.push(service)
+        
+            if(!(service instanceof Service)) return
+        
+            if(opts.probe) {
+                var service: Service = service
+                registry.probe(registry.server.mdns, service, (exists: any) => {
+                    if(exists) {
+                        service.stop()
+                        console.log(new Error('Service name is already in use on the network'))
+                        return
+                    }
+                    registry.announce(registry.server, service)
+                })
+            } else {
+                registry.announce(registry.server, service)
+            }
+        }
+        
+        function stop(service: Service, registry: Registry, callback?: CallableFunction) {
+            if (!service.activated) return
+        
+            if(!(service instanceof Service)) return
+            registry.teardown(registry.server, service, callback)
+          
+            var index = registry.services.indexOf(service)
+            if (index !== -1) registry.services.splice(index, 1)
+        }
+        
+        const service     = new Service(config)
+        service.start   = start.bind(null, service, this)
+        service.stop    = stop.bind(null, service, this)
         service.start({ probe: config.probe !== false })
         return service
     }
@@ -34,39 +66,6 @@ export class Registry {
 
     public destroy() {
         this.services.map(service => service.destroyed = true)
-    }
-
-    private start(registry: Registry, opts: Service) {
-        if (this.activated) return
-        this.activated = true
-
-        registry.services.push(this)
-
-        if(!(this instanceof Service)) return
-
-        if(opts.probe) {
-            var service: Service = this
-            registry.probe(registry.server.mdns, this, (exists: any) => {
-                if(exists) {
-                    service.stop()
-                    console.log(new Error('Service name is already in use on the network'))
-                    return
-                }
-                registry.announce(registry.server, service)
-            })
-        } else {
-            registry.announce(registry.server, this)
-        }
-    }
-
-    private stop(registry: Registry, callback?: CallableFunction) {
-        if (!this.activated) return
-
-        if(!(this instanceof Service)) return
-        registry.teardown(registry.server, this, callback)
-      
-        var index = registry.services.indexOf(this)
-        if (index !== -1) registry.services.splice(index, 1)
     }
 
     /**

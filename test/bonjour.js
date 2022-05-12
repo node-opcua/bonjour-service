@@ -176,3 +176,33 @@ test('bonjour.findOne - emitter', function (bonjour, t) {
   bonjour.publish({ name: 'Emitter', type: 'test', port: 3000 }).on('up', next())
   bonjour.publish({ name: 'Invalid', type: 'test2', port: 3000 }).on('up', next())
 })
+
+test('bonjour.publish multiple', (bonjour, t) => {
+  let counter = 0
+  const onUp = () => {
+    counter += 1
+    if (counter === 3) {
+      bonjour.destroy()
+      t.end()
+    }
+  }
+  bonjour.publish({ name: 'A', type: 'A', port: 3000 }).on('up', onUp)
+  bonjour.publish({ name: 'B', type: 'B', port: 3000 }).on('up', onUp)
+  bonjour.publish({ name: 'C', type: 'C', port: 3000 }).on('up', onUp)
+}, { timeout: 1000 })
+
+test('bonjour.publish multiple nested', (bonjour, t) => {
+  let counter = 0
+  bonjour.publish({ name: 'A', type: 'A', port: 3000 }).on('up', () => {
+    counter++
+    bonjour.publish({ name: 'B', type: 'B', port: 3000 }).on('up', () => {
+      counter++
+      bonjour.publish({ name: 'C', type: 'C', port: 3000 }).on('up', () => {
+        counter++
+        t.equal(counter, 3)
+        bonjour.destroy()
+        t.end()
+      })
+    })
+  })
+}, { timeout: 1000 })
