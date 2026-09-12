@@ -8,11 +8,11 @@ const test = require('tape')
 // styles are asserted on both the CommonJS and the ESM build output, so a
 // fix for one can no longer silently break the other.
 
-test('cjs build (dist/cjs) supports named and default require shapes', async function (t) {
-  const Bonjour = require('../dist/cjs')
-  const { Bonjour: NamedBonjour } = require('../dist/cjs')
-  const DefaultBonjour = require('../dist/cjs').default
-  const imported = await import('../dist/cjs/index.js')
+test('cjs build (dist) supports named and default require shapes', async function (t) {
+  const Bonjour = require('../dist')
+  const { Bonjour: NamedBonjour } = require('../dist')
+  const DefaultBonjour = require('../dist').default
+  const imported = await import('../dist/index.js')
 
   t.equal(typeof Bonjour, 'function')
   t.equal(Bonjour, NamedBonjour)

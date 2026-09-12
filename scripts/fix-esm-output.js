@@ -7,14 +7,15 @@
 // and TypeScript's own Node16/NodeNext resolution requires the same when a
 // consumer type-checks against the ".d.mts" files. This script renames the
 // esm build output to ".mjs" / ".d.mts" and patches relative specifiers to
-// match, then drops a package.json next to each output folder so Node knows
-// which format it is looking at without relying on the root manifest.
+// match, then drops a package.json next to dist/esm so Node knows it is
+// looking at ESM there without needing a "type" field on the root manifest
+// (the CommonJS build stays at dist/, unrelocated, and keeps relying on the
+// root manifest's default of "commonjs" the same way it always has).
 
 const fs = require('fs')
 const path = require('path')
 
 const esmDir = path.join(__dirname, '..', 'dist', 'esm')
-const cjsDir = path.join(__dirname, '..', 'dist', 'cjs')
 
 function walk (dir) {
   const out = []
@@ -81,7 +82,6 @@ function run () {
   }
 
   fs.writeFileSync(path.join(esmDir, 'package.json'), JSON.stringify({ type: 'module' }, null, 2) + '\n')
-  fs.writeFileSync(path.join(cjsDir, 'package.json'), JSON.stringify({ type: 'commonjs' }, null, 2) + '\n')
 }
 
 run()

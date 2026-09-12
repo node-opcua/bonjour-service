@@ -2,7 +2,7 @@
 
 const os = require('os')
 const test = require('tape')
-const { Service } = require('../dist/cjs/lib/service')
+const { Service } = require('../dist/lib/service')
 
 const getAddressesRecords = function (host) {
   const records = []
