@@ -4,8 +4,8 @@ const os = require('os')
 const dgram = require('dgram')
 const tape = require('tape')
 const afterAll = require('after-all')
-const { Service } = require('../dist/lib/service')
-const Bonjour = require('../dist')
+const { Service } = require('../dist/cjs/lib/service')
+const Bonjour = require('../dist/cjs')
 
 const getAddresses = function () {
   const addresses = []
