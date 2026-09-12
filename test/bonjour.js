@@ -197,6 +197,14 @@ test('bonjour.findOne - emitter', function (bonjour, t) {
   bonjour.publish({ name: 'Invalid', type: 'test2', port: 3000 }).on('up', next())
 })
 
+test('bonjour.findOne - destroy clears the pending timer', function (bonjour, t) {
+  bonjour.findOne({ type: 'never-found' }, 60000)
+  t.notEqual(bonjour.findOneTimer, undefined)
+  bonjour.destroy()
+  t.equal(bonjour.findOneTimer, undefined)
+  t.end()
+})
+
 test('bonjour.publish multiple', (bonjour, t) => {
   let counter = 0
   const onUp = () => {
