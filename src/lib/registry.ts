@@ -174,7 +174,15 @@ export class Registry {
         if (!Array.isArray(services)) services = [services]
     
         services = services.filter((service: Service) =>  service.activated) // ignore services not currently starting or started
-    
+
+        services.forEach((service: Service) => {
+            const timer = this.reannounceTimers.get(service)
+            if (timer !== undefined) {
+                clearTimeout(timer)
+                this.reannounceTimers.delete(service)
+            }
+        })
+
         var records: any = services.flatMap(function (service) {
             service.activated = false
             var records = service.records()
