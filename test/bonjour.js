@@ -197,11 +197,12 @@ test('bonjour.findOne - emitter', function (bonjour, t) {
   bonjour.publish({ name: 'Invalid', type: 'test2', port: 3000 }).on('up', next())
 })
 
-test('bonjour.findOne - destroy clears the pending timer', function (bonjour, t) {
-  bonjour.findOne({ type: 'never-found' }, 60000)
-  t.notEqual(bonjour.findOneTimer, undefined)
+test('bonjour.findOne - destroy clears every pending timer, even with concurrent lookups', function (bonjour, t) {
+  bonjour.findOne({ type: 'never-found-1' }, 60000)
+  bonjour.findOne({ type: 'never-found-2' }, 60000)
+  t.equal(bonjour.findOneTimers.size, 2)
   bonjour.destroy()
-  t.equal(bonjour.findOneTimer, undefined)
+  t.equal(bonjour.findOneTimers.size, 0)
   t.end()
 })
 
